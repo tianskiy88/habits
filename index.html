@@ -1,0 +1,1167 @@
+<title>Привычки недели</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Oswald:wght@400;500;600&display=swap">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  /* ---- tokens: light is the base set, both dark states redefine only values ---- */
+  :root {
+    --ground: #F6F5F0;
+    --surface: #FFFFFF;
+    --surface-2: #EEEDE6;
+    --ink: #16231D;
+    --ink-2: #35443C;
+    --muted: #6B7A73;
+    --line: #DEDCD3;
+    --line-strong: #C9C7BC;
+    --accent: #1D6B50;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #DDEAE2;
+    --warn: #B5761B;
+    --warn-soft: #F4E6CC;
+    --bad: #B84B47;
+    --bad-soft: #F3DCDA;
+    --shadow: 0 1px 2px rgba(20, 35, 28, .05), 0 10px 26px -14px rgba(20, 35, 28, .22);
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0E1411;
+      --surface: #161E1A;
+      --surface-2: #1F2923;
+      --ink: #E7EDE9;
+      --ink-2: #C3CEC8;
+      --muted: #8B9B92;
+      --line: #27312B;
+      --line-strong: #3A473F;
+      --accent: #46A87F;
+      --accent-ink: #07130E;
+      --accent-soft: #1B2F26;
+      --warn: #D79C45;
+      --warn-soft: #332814;
+      --bad: #D5726D;
+      --bad-soft: #331D1C;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 26px -14px rgba(0, 0, 0, .6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0E1411;
+    --surface: #161E1A;
+    --surface-2: #1F2923;
+    --ink: #E7EDE9;
+    --ink-2: #C3CEC8;
+    --muted: #8B9B92;
+    --line: #27312B;
+    --line-strong: #3A473F;
+    --accent: #46A87F;
+    --accent-ink: #07130E;
+    --accent-soft: #1B2F26;
+    --warn: #D79C45;
+    --warn-soft: #332814;
+    --bad: #D5726D;
+    --bad-soft: #331D1C;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 26px -14px rgba(0, 0, 0, .6);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Golos Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 18px 16px 96px;
+  }
+
+  h1, h2, h3 { margin: 0; text-wrap: balance; }
+
+  .eyebrow {
+    font-family: Oswald, "Golos Text", sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .num {
+    font-family: Oswald, "Golos Text", sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+
+  /* ---------- week header ---------- */
+  .weekbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .weekbar .label { text-align: center; line-height: 1.2; }
+  .weekbar .label .range { font-weight: 600; font-size: 15px; }
+  .weekbar .label .sub { font-size: 12px; color: var(--muted); }
+  .navbtn {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-2);
+    width: 38px; height: 38px;
+    border-radius: 11px;
+    font-size: 17px;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+  .navbtn:disabled { opacity: .35; cursor: default; }
+  .navbtn:active:not(:disabled) { background: var(--surface-2); }
+
+  /* ---------- summary ---------- */
+  .summary {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 18px;
+  }
+  .ring { width: 84px; height: 84px; flex: none; }
+  .ring text { font-family: Oswald, sans-serif; font-variant-numeric: tabular-nums; }
+  .summary .status { font-size: 17px; font-weight: 600; line-height: 1.25; }
+  .summary .facts {
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+  .summary .facts b { color: var(--ink-2); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ---------- habit list ---------- */
+  .list { display: flex; flex-direction: column; gap: 10px; }
+
+  .habit {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px 13px 11px;
+  }
+  .habit.prio-high { border-left: 3px solid var(--accent); }
+  .habit-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 2px;
+  }
+  .habit-name { font-weight: 600; font-size: 15px; }
+  .habit-cat { font-size: 12px; color: var(--muted); }
+  .habit-score { font-size: 13px; white-space: nowrap; color: var(--muted); }
+  .habit-score b { font-family: Oswald, sans-serif; font-variant-numeric: tabular-nums; color: var(--ink); font-size: 15px; font-weight: 600; }
+  .streak { color: var(--warn); font-weight: 600; }
+
+  .bar {
+    height: 4px;
+    border-radius: 3px;
+    background: var(--surface-2);
+    overflow: hidden;
+    margin: 8px 0 10px;
+  }
+  .bar > i { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+  .bar > i.mid { background: var(--warn); }
+  .bar > i.low { background: var(--bad); }
+
+  .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .day {
+    appearance: none;
+    border: 1px solid var(--line-strong);
+    background: transparent;
+    color: var(--muted);
+    border-radius: 10px;
+    padding: 5px 0 6px;
+    display: grid;
+    gap: 1px;
+    justify-items: center;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    line-height: 1;
+    transition: background .12s ease, color .12s ease, border-color .12s ease;
+  }
+  .day .dnum { font-family: Oswald, sans-serif; font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .day[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .day[aria-pressed="true"] .dnum { color: var(--accent-ink); }
+  .day.today { border-color: var(--accent); border-width: 2px; }
+  .day.future { opacity: .4; }
+  .day:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .note-row { margin-top: 9px; display: flex; gap: 8px; align-items: center; }
+  .note-row input {
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid transparent;
+    border-radius: 9px;
+    padding: 7px 10px;
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+  }
+  .note-row input:focus { border-color: var(--accent); outline: none; }
+  .note-row label { font-size: 12px; color: var(--muted); flex: none; }
+
+  /* ---------- insight ---------- */
+  .insight {
+    margin-top: 16px;
+    background: var(--accent-soft);
+    border-radius: var(--radius);
+    padding: 13px 14px;
+    font-size: 14px;
+    color: var(--ink-2);
+  }
+  .insight .eyebrow { color: var(--accent); margin-bottom: 3px; display: block; }
+  .insight p { margin: 0 0 6px; }
+  .insight p:last-child { margin-bottom: 0; }
+
+  /* ---------- month ---------- */
+  .mcard {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 13px 14px;
+  }
+  .mrow { display: flex; align-items: center; gap: 12px; }
+  .mrow + .mrow { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .mrow .mname { flex: 1; min-width: 0; }
+  .mrow .mname .n { font-weight: 600; font-size: 14px; }
+  .mrow .mname .c { font-size: 12px; color: var(--muted); }
+  .mrow .mtotal { font-family: Oswald, sans-serif; font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 48px; text-align: right; }
+  .spark { flex: none; }
+
+  .two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .pill {
+    border-radius: var(--radius);
+    padding: 12px 13px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .pill .eyebrow { display: block; margin-bottom: 4px; }
+  .pill .v { font-weight: 600; font-size: 14px; line-height: 1.25; }
+  .pill.good { background: var(--accent-soft); border-color: transparent; }
+  .pill.grow { background: var(--warn-soft); border-color: transparent; }
+
+  .weeklegend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* ---------- manage ---------- */
+  .mgmt-item {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 11px 13px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .mgmt-item .grow-col { flex: 1; min-width: 0; }
+  .mgmt-item .n { font-weight: 600; font-size: 14px; }
+  .mgmt-item .meta { font-size: 12px; color: var(--muted); }
+  .iconbtn {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--muted);
+    border-radius: 9px;
+    width: 34px; height: 34px;
+    font-size: 15px;
+    cursor: pointer;
+    flex: none;
+  }
+  .iconbtn.danger { color: var(--bad); border-color: var(--bad-soft); }
+  .iconbtn:active { background: var(--surface-2); }
+
+  form.editor {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px;
+    display: grid;
+    gap: 11px;
+    margin-top: 12px;
+  }
+  form.editor label.field { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
+  form.editor input[type="text"], form.editor input[type="number"] {
+    background: var(--surface-2);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 9px 11px;
+    font: inherit;
+    font-size: 15px;
+    color: var(--ink);
+    width: 100%;
+  }
+  form.editor input:focus { border-color: var(--accent); outline: none; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    appearance: none;
+    border: 1px solid var(--line-strong);
+    background: transparent;
+    color: var(--ink-2);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+  .btn {
+    appearance: none;
+    border: none;
+    border-radius: 11px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font: inherit;
+    font-weight: 600;
+    font-size: 15px;
+    padding: 11px 16px;
+    cursor: pointer;
+    width: 100%;
+  }
+  .btn.ghost {
+    background: transparent;
+    border: 1px solid var(--line-strong);
+    color: var(--ink-2);
+    font-weight: 500;
+  }
+  .btn:active { filter: brightness(.95); }
+
+  .rowbtns { display: flex; gap: 8px; }
+
+  .qty { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); }
+  .qty input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+
+  .stepper { display: flex; align-items: center; gap: 8px; }
+  .stepper .val { font-family: Oswald, sans-serif; font-size: 17px; font-variant-numeric: tabular-nums; min-width: 26px; text-align: center; }
+
+  /* ---------- tabs ---------- */
+  .tabs {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    display: flex;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    gap: 4px;
+    z-index: 10;
+  }
+  .tabs .inner { max-width: 560px; margin: 0 auto; display: flex; gap: 4px; width: 100%; }
+  .tab {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 9px 6px;
+    border-radius: 10px;
+    flex: 1;
+    cursor: pointer;
+  }
+  .tab[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+
+  .section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 22px 0 10px; }
+  .section-title h2 { font-size: 16px; font-weight: 600; }
+
+  .hint { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+  .hidden { display: none !important; }
+
+  textarea.io {
+    width: 100%;
+    min-height: 90px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    color: var(--ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    padding: 9px;
+    resize: vertical;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<div class="app">
+  <!-- WEEK -->
+  <section id="view-week">
+    <div class="weekbar">
+      <button class="navbtn" id="prevWeek" type="button" aria-label="Предыдущая неделя">‹</button>
+      <div class="label">
+        <div class="range" id="weekRange">—</div>
+        <div class="sub" id="weekSub">—</div>
+      </div>
+      <button class="navbtn" id="nextWeek" type="button" aria-label="Следующая неделя">›</button>
+    </div>
+
+    <div class="summary">
+      <svg class="ring" id="ring" viewBox="0 0 84 84" role="img" aria-labelledby="ringTitle">
+        <title id="ringTitle">Выполнение недели</title>
+      </svg>
+      <div>
+        <div class="status" id="weekStatus">—</div>
+        <div class="facts" id="weekFacts"></div>
+      </div>
+    </div>
+
+    <div class="list" id="weekList"></div>
+    <div id="insight"></div>
+  </section>
+
+  <!-- MONTH -->
+  <section id="view-month" class="hidden">
+    <div class="section-title">
+      <h2>Последние недели</h2>
+      <span class="eyebrow" id="monthSpan"></span>
+    </div>
+    <div class="mcard" id="monthList"></div>
+    <div class="two">
+      <div class="pill good">
+        <span class="eyebrow">Лучшая привычка</span>
+        <div class="v" id="bestHabit">—</div>
+      </div>
+      <div class="pill grow">
+        <span class="eyebrow">Зона роста</span>
+        <div class="v" id="worstHabit">—</div>
+      </div>
+    </div>
+    <div id="monthInsight"></div>
+  </section>
+
+  <!-- HABITS -->
+  <section id="view-manage" class="hidden">
+    <div class="section-title">
+      <h2>Привычки</h2>
+      <span class="eyebrow" id="habitCount"></span>
+    </div>
+    <div class="list" id="manageList"></div>
+
+    <button class="btn" id="addBtn" type="button" style="margin-top:12px">Добавить привычку</button>
+
+    <form class="editor hidden" id="editor">
+      <label class="field">Название
+        <input type="text" id="fName" maxlength="60" placeholder="Например: Прогулка 30 минут" required>
+      </label>
+      <label class="field">Категория
+        <input type="text" id="fCat" maxlength="30" list="catList" placeholder="Здоровье">
+        <datalist id="catList"></datalist>
+      </label>
+      <div class="field">Цель — раз в неделю
+        <div class="chips" id="fGoal"></div>
+      </div>
+      <div class="field">Приоритет
+        <div class="chips" id="fPrio"></div>
+      </div>
+      <label class="qty">
+        <input type="checkbox" id="fQty">
+        Считать количество, а не просто галочку
+      </label>
+      <div class="rowbtns hidden" id="qtyFields">
+        <label class="field" style="flex:1">Единица
+          <input type="text" id="fUnit" maxlength="12" placeholder="мин">
+        </label>
+        <label class="field" style="flex:1">Норма за день
+          <input type="number" id="fTarget" min="1" max="1000" placeholder="20">
+        </label>
+      </div>
+      <div class="rowbtns">
+        <button class="btn" type="submit" id="saveBtn">Сохранить</button>
+        <button class="btn ghost" type="button" id="cancelBtn">Отмена</button>
+      </div>
+    </form>
+
+    <div class="section-title"><h2>Данные</h2></div>
+    <div class="rowbtns">
+      <button class="btn ghost" type="button" id="exportBtn">Скопировать</button>
+      <button class="btn ghost" type="button" id="importBtn">Вставить</button>
+    </div>
+    <textarea class="io hidden" id="io" spellcheck="false" aria-label="Данные трекера в формате JSON"></textarea>
+    <p class="hint" id="ioHint">Копия всех отметок текстом — чтобы перенести на другое устройство или сохранить у себя.</p>
+
+    <div class="section-title"><h2>Пример</h2></div>
+    <button class="btn ghost" type="button" id="wipeBtn">Очистить данные-пример</button>
+    <p class="hint">Сейчас загружены привычки и история из таблицы Миши, чтобы было видно, как это работает. Очистка оставит привычки, но уберёт все отметки.</p>
+  </section>
+</div>
+
+<nav class="tabs" aria-label="Разделы">
+  <div class="inner">
+    <button class="tab" type="button" data-view="week" aria-selected="true">Неделя</button>
+    <button class="tab" type="button" data-view="month" aria-selected="false">Месяц</button>
+    <button class="tab" type="button" data-view="manage" aria-selected="false">Привычки</button>
+  </div>
+</nav>
+
+<script>
+(function () {
+  'use strict';
+
+  var STORE_KEY = 'habit-tracker-v1';
+  var DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  var MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+                    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+
+  // Telegram mini-app host, when present. Everything is optional: the same
+  // page runs in a plain browser, so every call is behind a guard.
+  var tg = (window.Telegram && window.Telegram.WebApp) || null;
+
+  /* ---------------- dates ---------------- */
+
+  function startOfDay(d) { var x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+
+  function mondayOf(d) {
+    var x = startOfDay(d);
+    var shift = (x.getDay() + 6) % 7; // Mon = 0
+    x.setDate(x.getDate() - shift);
+    return x;
+  }
+
+  function addDays(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
+
+  function key(d) {
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function weekDates(monday) {
+    var out = [];
+    for (var i = 0; i < 7; i++) out.push(addDays(monday, i));
+    return out;
+  }
+
+  function rangeLabel(monday) {
+    var a = monday, b = addDays(monday, 6);
+    if (a.getMonth() === b.getMonth()) {
+      return a.getDate() + '–' + b.getDate() + ' ' + MONTHS_GEN[b.getMonth()];
+    }
+    return a.getDate() + ' ' + MONTHS_GEN[a.getMonth()] + ' – ' + b.getDate() + ' ' + MONTHS_GEN[b.getMonth()];
+  }
+
+  /* ---------------- state ---------------- */
+
+  var TODAY = startOfDay(new Date());
+  var THIS_MONDAY = mondayOf(TODAY);
+  var cursor = new Date(THIS_MONDAY); // monday of the week on screen
+  var view = 'week';
+  var editingId = null;
+  var pendingDelete = null;
+
+  var state = load() || seed();
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      if (!parsed || !Array.isArray(parsed.habits)) return null;
+      parsed.log = parsed.log || {};
+      parsed.notes = parsed.notes || {};
+      return parsed;
+    } catch (e) { return null; }
+  }
+
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* private mode */ }
+  }
+
+  // Habits and the first archived week come straight from Misha's sheet:
+  // 7/7 зарядка, 0/7 сон, 5/7 чтение, 3/7 планирование, 6/7 порядок, 1/4 с Максом.
+  function seed() {
+    var habits = [
+      { id: 'h1', name: 'Зарядка / Тренировка', cat: 'Здоровье', goal: 7, prio: 'high' },
+      { id: 'h2', name: 'Сон 7–8 часов', cat: 'Здоровье', goal: 7, prio: 'high' },
+      { id: 'h3', name: 'Чтение', cat: 'Саморазвитие', goal: 7, prio: 'mid', qty: { unit: 'мин', target: 20 } },
+      { id: 'h4', name: 'Планирование дня', cat: 'Продуктивность', goal: 7, prio: 'high' },
+      { id: 'h5', name: 'Порядок / Рутина', cat: 'Продуктивность', goal: 7, prio: 'low' },
+      { id: 'h6', name: 'Тренировка с Максом', cat: 'Семья', goal: 4, prio: 'high' }
+    ];
+    // pattern[weeksAgo][habitIndex] = which weekday indexes were done
+    var plan = {
+      3: { h1: [0, 1, 2, 3, 4, 5, 6], h2: [], h3: [0, 1, 3, 4, 6], h4: [0, 2, 4], h5: [0, 1, 2, 3, 4, 6], h6: [5] },
+      2: { h1: [0, 1, 2, 4, 5, 6], h2: [0, 3, 4, 6], h3: [0, 1, 2, 4, 5], h4: [0, 1, 4], h5: [0, 1, 3, 4, 5], h6: [1, 5] },
+      1: { h1: [0, 1, 2, 3, 4, 6], h2: [0, 1, 3, 4, 5, 6], h3: [0, 1, 2, 3, 4, 6], h4: [0, 1, 4, 6], h5: [0, 2, 3, 4, 5], h6: [1, 3, 5] }
+    };
+    var log = {}, notes = {};
+    habits.forEach(function (h) { log[h.id] = {}; notes[h.id] = {}; });
+
+    Object.keys(plan).forEach(function (ago) {
+      var monday = addDays(THIS_MONDAY, -7 * Number(ago));
+      Object.keys(plan[ago]).forEach(function (hid) {
+        plan[ago][hid].forEach(function (i) {
+          var h = habits.filter(function (x) { return x.id === hid; })[0];
+          log[hid][key(addDays(monday, i))] = h.qty ? h.qty.target + 5 : true;
+        });
+      });
+    });
+    notes.h2[key(addDays(THIS_MONDAY, -21 + 2))] = 'лёг в 2 ночи';
+
+    // current week up to today
+    var upto = (TODAY.getDay() + 6) % 7;
+    var current = { h1: [0, 1, 2, 3, 4, 5, 6], h2: [0, 1, 2, 4, 5, 6], h3: [0, 2, 3, 5, 6], h4: [0, 1, 2, 3, 4], h5: [0, 1, 3, 4, 5], h6: [1, 3] };
+    Object.keys(current).forEach(function (hid) {
+      current[hid].forEach(function (i) {
+        if (i > upto) return;
+        var h = habits.filter(function (x) { return x.id === hid; })[0];
+        log[hid][key(addDays(THIS_MONDAY, i))] = h.qty ? h.qty.target + 10 : true;
+      });
+    });
+
+    return { habits: habits, log: log, notes: notes, sample: true };
+  }
+
+  /* ---------------- derived ---------------- */
+
+  function isDone(habit, date) {
+    var rec = state.log[habit.id];
+    if (!rec) return false;
+    var v = rec[key(date)];
+    if (v === true) return true;
+    if (typeof v === 'number') return habit.qty ? v >= habit.qty.target : v > 0;
+    return false;
+  }
+
+  function doneInWeek(habit, monday) {
+    return weekDates(monday).reduce(function (n, d) { return n + (isDone(habit, d) ? 1 : 0); }, 0);
+  }
+
+  function weekRatio(habit, monday) {
+    var done = doneInWeek(habit, monday);
+    return habit.goal > 0 ? Math.min(done / habit.goal, 1) : 0;
+  }
+
+  // Daily habits (goal 7) get a streak in days that crosses week borders —
+  // the thing a week-shaped spreadsheet structurally cannot count.
+  // Habits with a weekly quota get a streak in weeks where the quota was met.
+  function streak(habit) {
+    if (habit.goal >= 7) {
+      var n = 0;
+      var d = new Date(TODAY);
+      if (!isDone(habit, d)) d = addDays(d, -1); // today still open
+      while (isDone(habit, d) && n < 999) { n++; d = addDays(d, -1); }
+      return { n: n, unit: n === 1 ? 'день подряд' : (n % 10 >= 2 && n % 10 <= 4 && (n < 12 || n > 14) ? 'дня подряд' : 'дней подряд') };
+    }
+    var w = 0;
+    var m = new Date(THIS_MONDAY);
+    if (doneInWeek(habit, m) < habit.goal) m = addDays(m, -7); // current week still open
+    while (doneInWeek(habit, m) >= habit.goal && w < 999) { w++; m = addDays(m, -7); }
+    return { n: w, unit: w === 1 ? 'неделя подряд' : (w >= 2 && w <= 4 ? 'недели подряд' : 'недель подряд') };
+  }
+
+  function weekAverage(monday) {
+    if (!state.habits.length) return 0;
+    var sum = state.habits.reduce(function (s, h) { return s + weekRatio(h, monday); }, 0);
+    return sum / state.habits.length;
+  }
+
+  // Misha's own thresholds and wording, kept as they were.
+  function statusText(ratio) {
+    if (ratio >= 0.8) return 'Отличный темп';
+    if (ratio >= 0.5) return 'Хороший результат';
+    if (ratio > 0) return 'Набираем обороты';
+    return 'Время начать';
+  }
+
+  function ratioClass(r) { return r >= 0.8 ? '' : (r >= 0.5 ? 'mid' : 'low'); }
+
+  function lastWeeks(count) {
+    var out = [];
+    for (var i = count - 1; i >= 0; i--) out.push(addDays(THIS_MONDAY, -7 * i));
+    return out;
+  }
+
+  // The pattern a checkbox grid hides: which weekday actually fails most.
+  function weakestWeekday() {
+    var weeks = lastWeeks(6);
+    var miss = [0, 0, 0, 0, 0, 0, 0], seen = [0, 0, 0, 0, 0, 0, 0];
+    weeks.forEach(function (m) {
+      weekDates(m).forEach(function (d, i) {
+        if (d > TODAY) return;
+        state.habits.forEach(function (h) {
+          if (h.goal < 7) return; // a 4-times-a-week habit is allowed to skip days
+          seen[i]++;
+          if (!isDone(h, d)) miss[i]++;
+        });
+      });
+    });
+    var best = -1, bestRate = 0, total = 0;
+    for (var i = 0; i < 7; i++) {
+      total += seen[i];
+      if (seen[i] < 3) continue;
+      var rate = miss[i] / seen[i];
+      if (rate > bestRate) { bestRate = rate; best = i; }
+    }
+    if (best < 0 || total < 20 || bestRate < 0.34) return null;
+    return { day: DAY_NAMES[best], pct: Math.round(bestRate * 100) };
+  }
+
+  /* ---------------- rendering ---------------- */
+
+  var el = function (id) { return document.getElementById(id); };
+
+  function renderRing(ratio) {
+    var pct = Math.round(ratio * 100);
+    var r = 34, c = 2 * Math.PI * r;
+    var color = ratio >= 0.8 ? 'var(--accent)' : (ratio >= 0.5 ? 'var(--warn)' : 'var(--bad)');
+    el('ring').innerHTML =
+      '<title>Выполнение недели</title>' +
+      '<circle cx="42" cy="42" r="' + r + '" fill="none" stroke="var(--surface-2)" stroke-width="8"/>' +
+      '<circle cx="42" cy="42" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="8" stroke-linecap="round"' +
+      ' stroke-dasharray="' + (c * ratio).toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 42 42)"/>' +
+      '<text x="42" y="48" text-anchor="middle" font-size="22" font-weight="600" fill="var(--ink)">' + pct + '</text>' +
+      '<text x="42" y="61" text-anchor="middle" font-size="9" fill="var(--muted)">процентов</text>';
+  }
+
+  function renderWeek() {
+    var monday = cursor;
+    var dates = weekDates(monday);
+    el('weekRange').textContent = rangeLabel(monday);
+    var diff = Math.round((monday - THIS_MONDAY) / 604800000);
+    el('weekSub').textContent = diff === 0 ? 'текущая неделя'
+      : (diff === -1 ? 'прошлая неделя' : (diff < 0 ? Math.abs(diff) + ' нед. назад' : 'будущая неделя'));
+    el('nextWeek').disabled = diff >= 0;
+
+    var avg = weekAverage(monday);
+    renderRing(avg);
+    el('weekStatus').textContent = statusText(avg);
+
+    var totalDone = state.habits.reduce(function (s, h) { return s + doneInWeek(h, monday); }, 0);
+    var totalGoal = state.habits.reduce(function (s, h) { return s + h.goal; }, 0);
+    el('weekFacts').innerHTML =
+      'Привычек: <b>' + state.habits.length + '</b>' +
+      '<span>Отмечено: <b>' + totalDone + '</b> из <b>' + totalGoal + '</b></span>';
+
+    var list = el('weekList');
+    list.innerHTML = '';
+    if (!state.habits.length) {
+      list.innerHTML = '<div class="mcard">Привычек пока нет. Раздел «Привычки» внизу — добавить.</div>';
+      el('insight').innerHTML = '';
+      return;
+    }
+
+    state.habits.forEach(function (h) {
+      var done = doneInWeek(h, monday);
+      var ratio = weekRatio(h, monday);
+      var st = streak(h);
+
+      var card = document.createElement('div');
+      card.className = 'habit' + (h.prio === 'high' ? ' prio-high' : '');
+
+      var top = document.createElement('div');
+      top.className = 'habit-top';
+      top.innerHTML =
+        '<div><div class="habit-name"></div><div class="habit-cat"></div></div>' +
+        '<div class="habit-score"><b>' + done + '</b>/' + h.goal +
+        (st.n > 0 ? ' <span class="streak">· ' + st.n + ' 🔥</span>' : '') + '</div>';
+      top.querySelector('.habit-name').textContent = h.name;
+      top.querySelector('.habit-cat').textContent = h.cat + (st.n > 0 ? ' · ' + st.n + ' ' + st.unit : '');
+      card.appendChild(top);
+
+      var bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.innerHTML = '<i class="' + ratioClass(ratio) + '" style="width:' + (ratio * 100).toFixed(0) + '%"></i>';
+      card.appendChild(bar);
+
+      var days = document.createElement('div');
+      days.className = 'days';
+      dates.forEach(function (d, i) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        var on = isDone(h, d);
+        var future = d > TODAY;
+        b.className = 'day' + (key(d) === key(TODAY) ? ' today' : '') + (future ? ' future' : '');
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.setAttribute('aria-label', h.name + ', ' + DAY_NAMES[i] + ' ' + d.getDate());
+        b.innerHTML = '<span>' + DAY_NAMES[i] + '</span><span class="dnum">' + d.getDate() + '</span>';
+        b.addEventListener('click', function () { toggle(h, d); });
+        days.appendChild(b);
+      });
+      card.appendChild(days);
+
+      // A missed day is where the useful information is, so ask for it there.
+      var missedToday = key(monday) === key(THIS_MONDAY) && !isDone(h, TODAY) && h.goal >= 7;
+      var existingNote = (state.notes[h.id] || {})[key(TODAY)];
+      if (missedToday || existingNote) {
+        var nr = document.createElement('div');
+        nr.className = 'note-row';
+        nr.innerHTML = '<label for="note-' + h.id + '">Что помешало</label>' +
+          '<input id="note-' + h.id + '" type="text" maxlength="80" placeholder="одной строкой, если хочешь">';
+        var input = nr.querySelector('input');
+        input.value = existingNote || '';
+        input.addEventListener('change', function () {
+          state.notes[h.id] = state.notes[h.id] || {};
+          if (input.value.trim()) state.notes[h.id][key(TODAY)] = input.value.trim();
+          else delete state.notes[h.id][key(TODAY)];
+          save();
+        });
+        card.appendChild(nr);
+      }
+
+      list.appendChild(card);
+    });
+
+    renderInsight();
+  }
+
+  function renderInsight() {
+    var box = el('insight');
+    var weak = weakestWeekday();
+    var lines = [];
+    if (weak) lines.push('Чаще всего срывы приходятся на <b>' + weak.day.toLowerCase() + '</b> — ' + weak.pct + '% пропусков за шесть недель.');
+
+    var улучшил = null, упал = null;
+    var prev = addDays(THIS_MONDAY, -7);
+    state.habits.forEach(function (h) {
+      var now = weekRatio(h, THIS_MONDAY), was = weekRatio(h, prev);
+      var delta = now - was;
+      if (delta >= 0.2 && (!улучшил || delta > улучшил.d)) улучшил = { h: h, d: delta };
+      if (delta <= -0.2 && (!упал || delta < упал.d)) упал = { h: h, d: delta };
+    });
+    if (упал) lines.push('«' + упал.h.name + '» идёт хуже прошлой недели — стоит посмотреть, что изменилось.');
+    else if (улучшил) lines.push('«' + улучшил.h.name + '» заметно лучше прошлой недели.');
+
+    if (!lines.length) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="insight"><span class="eyebrow">Что видно по данным</span>' +
+      lines.map(function (l) { return '<p>' + l + '</p>'; }).join('') + '</div>';
+  }
+
+  function sparkline(values) {
+    var w = 74, h = 26, pad = 3;
+    if (values.length < 2) return '<svg class="spark" width="' + w + '" height="' + h + '"></svg>';
+    var step = (w - pad * 2) / (values.length - 1);
+    var pts = values.map(function (v, i) {
+      return (pad + i * step).toFixed(1) + ',' + (h - pad - v * (h - pad * 2)).toFixed(1);
+    });
+    var last = values[values.length - 1];
+    var color = last >= 0.8 ? 'var(--accent)' : (last >= 0.5 ? 'var(--warn)' : 'var(--bad)');
+    var lastPt = pts[pts.length - 1].split(',');
+    return '<svg class="spark" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="Динамика по неделям">' +
+      '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle cx="' + lastPt[0] + '" cy="' + lastPt[1] + '" r="2.6" fill="' + color + '"/></svg>';
+  }
+
+  function renderMonth() {
+    var weeks = lastWeeks(5);
+    el('monthSpan').textContent = rangeLabel(weeks[0]).split('–')[0].trim() + ' — сегодня';
+
+    var box = el('monthList');
+    box.innerHTML = '';
+    if (!state.habits.length) { box.textContent = 'Привычек пока нет.'; return; }
+
+    var totals = [];
+    state.habits.forEach(function (h) {
+      var vals = weeks.map(function (m) { return weekRatio(h, m); });
+      // the running week is partial, so it is shown but not averaged into the total
+      var closed = vals.slice(0, vals.length - 1);
+      var avg = closed.reduce(function (a, b) { return a + b; }, 0) / Math.max(closed.length, 1);
+      totals.push({ h: h, avg: avg });
+
+      var row = document.createElement('div');
+      row.className = 'mrow';
+      row.innerHTML =
+        '<div class="mname"><div class="n"></div><div class="c"></div></div>' +
+        sparkline(vals) +
+        '<div class="mtotal">' + Math.round(avg * 100) + '%</div>';
+      row.querySelector('.n').textContent = h.name;
+      row.querySelector('.c').textContent = h.cat + ' · цель ' + h.goal + '/нед';
+      box.appendChild(row);
+    });
+
+    var legend = document.createElement('div');
+    legend.className = 'weeklegend';
+    legend.innerHTML = weeks.map(function (m, i) {
+      return '<span>' + (i === weeks.length - 1 ? 'сейчас' : rangeLabel(m).split(' ')[0]) + '</span>';
+    }).join('');
+    box.appendChild(legend);
+
+    totals.sort(function (a, b) { return b.avg - a.avg; });
+    el('bestHabit').textContent = totals[0].h.name + ' — ' + Math.round(totals[0].avg * 100) + '%';
+    var worst = totals[totals.length - 1];
+    el('worstHabit').textContent = worst.h.name + ' — ' + Math.round(worst.avg * 100) + '%';
+
+    var notes = [];
+    state.habits.forEach(function (h) {
+      var rec = state.notes[h.id] || {};
+      Object.keys(rec).sort().reverse().slice(0, 2).forEach(function (k) {
+        notes.push('<p>«' + rec[k] + '» — ' + h.name.toLowerCase() + ', ' + k.slice(8) + '.' + k.slice(5, 7) + '</p>');
+      });
+    });
+    el('monthInsight').innerHTML = notes.length
+      ? '<div class="insight" style="margin-top:14px"><span class="eyebrow">Причины срывов</span>' + notes.slice(0, 4).join('') + '</div>'
+      : '';
+  }
+
+  function renderManage() {
+    var list = el('manageList');
+    list.innerHTML = '';
+    el('habitCount').textContent = state.habits.length + ' шт.';
+
+    state.habits.forEach(function (h, idx) {
+      var item = document.createElement('div');
+      item.className = 'mgmt-item';
+      item.innerHTML =
+        '<div class="grow-col"><div class="n"></div><div class="meta"></div></div>' +
+        '<button class="iconbtn" type="button" aria-label="Выше">↑</button>' +
+        '<button class="iconbtn" type="button" aria-label="Изменить">✎</button>' +
+        '<button class="iconbtn danger" type="button" aria-label="Удалить">✕</button>';
+      item.querySelector('.n').textContent = h.name;
+      item.querySelector('.meta').textContent = h.cat + ' · ' + h.goal + ' раз в неделю' +
+        (h.qty ? ' · ' + h.qty.target + ' ' + h.qty.unit : '') +
+        (h.prio === 'high' ? ' · высокий' : '');
+
+      var btns = item.querySelectorAll('button');
+      btns[0].disabled = idx === 0;
+      btns[0].addEventListener('click', function () {
+        var tmp = state.habits[idx - 1];
+        state.habits[idx - 1] = state.habits[idx];
+        state.habits[idx] = tmp;
+        save(); renderManage(); renderWeek();
+      });
+      btns[1].addEventListener('click', function () { openEditor(h); });
+      btns[2].addEventListener('click', function () {
+        if (pendingDelete === h.id) {
+          state.habits = state.habits.filter(function (x) { return x.id !== h.id; });
+          delete state.log[h.id]; delete state.notes[h.id];
+          pendingDelete = null;
+          save(); renderManage(); renderWeek();
+        } else {
+          pendingDelete = h.id;
+          btns[2].textContent = 'точно?';
+          btns[2].style.width = 'auto';
+          btns[2].style.padding = '0 10px';
+          setTimeout(function () {
+            if (pendingDelete === h.id) { pendingDelete = null; renderManage(); }
+          }, 3000);
+        }
+      });
+      list.appendChild(item);
+    });
+
+    var cats = {};
+    state.habits.forEach(function (h) { cats[h.cat] = 1; });
+    el('catList').innerHTML = Object.keys(cats).map(function (c) { return '<option value="' + c + '"></option>'; }).join('');
+  }
+
+  /* ---------------- actions ---------------- */
+
+  function toggle(habit, date) {
+    var rec = state.log[habit.id] = state.log[habit.id] || {};
+    var k = key(date);
+    if (isDone(habit, date)) delete rec[k];
+    else rec[k] = habit.qty ? habit.qty.target : true;
+    if (state.sample) state.sample = false;
+    save();
+    if (tg && tg.HapticFeedback) { try { tg.HapticFeedback.selectionChanged(); } catch (e) {} }
+    renderWeek();
+  }
+
+  var goalChoice = 7, prioChoice = 'mid';
+
+  function buildChips(host, options, current, onPick) {
+    host.innerHTML = '';
+    options.forEach(function (o) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.textContent = o.label;
+      b.setAttribute('aria-pressed', o.value === current ? 'true' : 'false');
+      b.addEventListener('click', function () { onPick(o.value); });
+      host.appendChild(b);
+    });
+  }
+
+  function refreshChips() {
+    buildChips(el('fGoal'), [1, 2, 3, 4, 5, 6, 7].map(function (n) { return { value: n, label: String(n) }; }),
+      goalChoice, function (v) { goalChoice = v; refreshChips(); });
+    buildChips(el('fPrio'), [
+      { value: 'high', label: 'Высокий' },
+      { value: 'mid', label: 'Средний' },
+      { value: 'low', label: 'Обычный' }
+    ], prioChoice, function (v) { prioChoice = v; refreshChips(); });
+  }
+
+  function openEditor(habit) {
+    editingId = habit ? habit.id : null;
+    el('fName').value = habit ? habit.name : '';
+    el('fCat').value = habit ? habit.cat : '';
+    goalChoice = habit ? habit.goal : 7;
+    prioChoice = habit ? habit.prio : 'mid';
+    el('fQty').checked = !!(habit && habit.qty);
+    el('fUnit').value = habit && habit.qty ? habit.qty.unit : '';
+    el('fTarget').value = habit && habit.qty ? habit.qty.target : '';
+    el('qtyFields').classList.toggle('hidden', !el('fQty').checked);
+    el('saveBtn').textContent = habit ? 'Сохранить' : 'Добавить';
+    refreshChips();
+    el('editor').classList.remove('hidden');
+    el('addBtn').classList.add('hidden');
+    el('fName').focus();
+  }
+
+  function closeEditor() {
+    el('editor').classList.add('hidden');
+    el('addBtn').classList.remove('hidden');
+    editingId = null;
+  }
+
+  el('addBtn').addEventListener('click', function () { openEditor(null); });
+  el('cancelBtn').addEventListener('click', closeEditor);
+  el('fQty').addEventListener('change', function () {
+    el('qtyFields').classList.toggle('hidden', !el('fQty').checked);
+  });
+
+  el('editor').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = el('fName').value.trim();
+    if (!name) return;
+    var qty = null;
+    if (el('fQty').checked) {
+      var target = parseInt(el('fTarget').value, 10);
+      qty = { unit: el('fUnit').value.trim() || 'ед.', target: target > 0 ? target : 1 };
+    }
+    if (editingId) {
+      state.habits.forEach(function (h) {
+        if (h.id !== editingId) return;
+        h.name = name;
+        h.cat = el('fCat').value.trim() || 'Без категории';
+        h.goal = goalChoice;
+        h.prio = prioChoice;
+        if (qty) h.qty = qty; else delete h.qty;
+      });
+    } else {
+      var id = 'h' + Date.now().toString(36);
+      var nh = { id: id, name: name, cat: el('fCat').value.trim() || 'Без категории', goal: goalChoice, prio: prioChoice };
+      if (qty) nh.qty = qty;
+      state.habits.push(nh);
+      state.log[id] = {}; state.notes[id] = {};
+    }
+    save(); closeEditor(); renderManage(); renderWeek();
+  });
+
+  el('prevWeek').addEventListener('click', function () { cursor = addDays(cursor, -7); renderWeek(); });
+  el('nextWeek').addEventListener('click', function () {
+    if (cursor >= THIS_MONDAY) return;
+    cursor = addDays(cursor, 7);
+    renderWeek();
+  });
+
+  el('exportBtn').addEventListener('click', function () {
+    var text = JSON.stringify(state);
+    var io = el('io');
+    io.classList.remove('hidden');
+    io.value = text;
+    io.select();
+    var ok = false;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        el('ioHint').textContent = 'Скопировано в буфер обмена.';
+      }, function () {
+        el('ioHint').textContent = 'Выдели текст выше и скопируй вручную.';
+      });
+      ok = true;
+    }
+    if (!ok) el('ioHint').textContent = 'Выдели текст выше и скопируй вручную.';
+  });
+
+  el('importBtn').addEventListener('click', function () {
+    var io = el('io');
+    if (io.classList.contains('hidden')) {
+      io.classList.remove('hidden');
+      io.value = '';
+      el('ioHint').textContent = 'Вставь сюда сохранённый текст и нажми «Вставить» ещё раз.';
+      io.focus();
+      return;
+    }
+    try {
+      var parsed = JSON.parse(io.value);
+      if (!parsed || !Array.isArray(parsed.habits)) throw new Error('нет привычек');
+      state = { habits: parsed.habits, log: parsed.log || {}, notes: parsed.notes || {} };
+      save();
+      io.classList.add('hidden');
+      el('ioHint').textContent = 'Данные загружены.';
+      renderAll();
+    } catch (err) {
+      el('ioHint').textContent = 'Не получилось прочитать: ' + err.message + '. Нужен текст целиком, как скопировали.';
+    }
+  });
+
+  el('wipeBtn').addEventListener('click', function () {
+    state.habits.forEach(function (h) { state.log[h.id] = {}; state.notes[h.id] = {}; });
+    state.sample = false;
+    save();
+    renderAll();
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+    t.addEventListener('click', function () {
+      view = t.dataset.view;
+      Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (x) {
+        x.setAttribute('aria-selected', x === t ? 'true' : 'false');
+      });
+      el('view-week').classList.toggle('hidden', view !== 'week');
+      el('view-month').classList.toggle('hidden', view !== 'month');
+      el('view-manage').classList.toggle('hidden', view !== 'manage');
+      renderAll();
+      window.scrollTo(0, 0);
+    });
+  });
+
+  function renderAll() {
+    if (view === 'week') renderWeek();
+    else if (view === 'month') renderMonth();
+    else renderManage();
+  }
+
+  if (tg) {
+    try {
+      tg.ready();
+      tg.expand();
+      if (tg.colorScheme === 'dark' || tg.colorScheme === 'light') {
+        document.documentElement.setAttribute('data-theme', tg.colorScheme);
+      }
+      tg.onEvent('themeChanged', function () {
+        document.documentElement.setAttribute('data-theme', tg.colorScheme);
+      });
+    } catch (e) { /* older clients */ }
+  }
+
+  renderWeek();
+})();
+</script>
