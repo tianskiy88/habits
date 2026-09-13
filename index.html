@@ -406,6 +406,22 @@
   }
   .tab[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
 
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 74px;
+    transform: translateX(-50%);
+    max-width: calc(100% - 32px);
+    background: var(--ink);
+    color: var(--ground);
+    padding: 9px 15px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: var(--shadow);
+    z-index: 20;
+  }
+
   .section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 22px 0 10px; }
   .section-title h2 { font-size: 16px; font-weight: 600; }
 
@@ -531,13 +547,17 @@
       <button class="btn ghost" type="button" id="importBtn">Восстановить</button>
     </div>
     <textarea class="io hidden" id="io" spellcheck="false" aria-label="Копия данных трекера"></textarea>
-    <p class="hint" id="ioHint">Отметки хранятся на этом устройстве. «Сохранить копию» кладёт их в буфер обмена — перешли себе в «Избранное», и данные не потеряются при смене телефона.</p>
+    <p class="hint" id="ioHint">Внутри Telegram отметки переносятся между устройствами сами. Эти кнопки — на всякий случай: копия в буфер обмена, чтобы сохранить её себе в «Избранное».</p>
 
     <div class="section-title"><h2>Пример</h2></div>
     <button class="btn ghost" type="button" id="wipeBtn">Очистить данные-пример</button>
     <p class="hint">Сейчас загружены привычки и история из таблицы Миши, чтобы было видно, как это работает. Очистка оставит привычки, но уберёт все отметки.</p>
+
+    <p class="hint" id="syncLine" style="margin-top:22px"></p>
   </section>
 </div>
+
+<div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
 
 <nav class="tabs" aria-label="Разделы">
   <div class="inner">
@@ -551,6 +571,7 @@
 (function () {
   'use strict';
 
+  var APP_VERSION = '13.09-4';
   var STORE_KEY = 'habit-tracker-v1';
   var DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   var MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
@@ -616,8 +637,81 @@
     } catch (e) { return null; }
   }
 
+  /* ---- storage ----
+     The device (localStorage) is the fast local copy. When the page runs
+     inside Telegram it also mirrors into Telegram CloudStorage, which is
+     per-user and server-side: the same marks then show up on the phone and
+     on the desktop without anyone copying text around. Values there are
+     capped at ~4 KB, so the payload is split across numbered keys. */
+
+  var cloud = null;
+  try {
+    if (tg && tg.CloudStorage && tg.isVersionAtLeast && tg.isVersionAtLeast('6.9')) cloud = tg.CloudStorage;
+  } catch (e) { cloud = null; }
+
+  var CHUNK = 3500;
+  var CLOUD_META = 'hb_meta';
+  var saveTimer = null;
+
   function save() {
+    state.updatedAt = Date.now();
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* private mode */ }
+    if (!cloud) return;
+    // rapid tapping would otherwise fire a write per tap
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveCloud, 700);
+  }
+
+  function saveCloud() {
+    if (!cloud) return;
+    var text;
+    try { text = JSON.stringify(state); } catch (e) { return; }
+    var parts = [];
+    for (var i = 0; i < text.length; i += CHUNK) parts.push(text.slice(i, i + CHUNK));
+
+    var written = 0;
+    function afterPart() {
+      written++;
+      if (written < parts.length) return;
+      // meta goes last: until it names the new part count, a half-written
+      // set is simply ignored by the reader
+      try {
+        cloud.setItem(CLOUD_META, JSON.stringify({ n: parts.length, t: state.updatedAt || 0 }), function () {});
+      } catch (e) { /* offline */ }
+    }
+
+    try {
+      parts.forEach(function (part, idx) {
+        cloud.setItem('hb_' + idx, part, afterPart);
+      });
+      if (!parts.length) afterPart();
+    } catch (e) { /* offline */ }
+  }
+
+  function loadCloud(done) {
+    if (!cloud) { done(null); return; }
+    try {
+      cloud.getItem(CLOUD_META, function (err, raw) {
+        if (err || !raw) { done(null); return; }
+        var meta;
+        try { meta = JSON.parse(raw); } catch (e) { done(null); return; }
+        if (!meta || !meta.n) { done(null); return; }
+        var keys = [];
+        for (var i = 0; i < meta.n; i++) keys.push('hb_' + i);
+        cloud.getItems(keys, function (err2, map) {
+          if (err2 || !map) { done(null); return; }
+          var text = '';
+          for (var j = 0; j < keys.length; j++) {
+            if (typeof map[keys[j]] !== 'string') { done(null); return; } // incomplete set
+            text += map[keys[j]];
+          }
+          var parsed;
+          try { parsed = JSON.parse(text); } catch (e) { done(null); return; }
+          if (!parsed || !Array.isArray(parsed.habits)) { done(null); return; }
+          done(parsed);
+        });
+      });
+    } catch (e) { done(null); }
   }
 
   // Habits and the first archived week come straight from Misha's sheet:
@@ -763,6 +857,15 @@
   /* ---------------- rendering ---------------- */
 
   var el = function (id) { return document.getElementById(id); };
+
+  var flashTimer = null;
+  function flash(text) {
+    var box = el('toast');
+    box.textContent = text;
+    box.classList.remove('hidden');
+    if (flashTimer) clearTimeout(flashTimer);
+    flashTimer = setTimeout(function () { box.classList.add('hidden'); }, 2600);
+  }
 
   function renderRing(ratio) {
     var pct = Math.round(ratio * 100);
@@ -966,6 +1069,10 @@
     var list = el('manageList');
     list.innerHTML = '';
     el('habitCount').textContent = state.habits.length + ' шт.';
+    el('syncLine').textContent = (cloud
+      ? 'Отметки сохраняются в Telegram — телефон и компьютер видят одно и то же.'
+      : 'Отметки сохраняются только на этом устройстве: приложение открыто вне Telegram.')
+      + ' Версия ' + APP_VERSION + '.';
 
     state.habits.forEach(function (h, idx) {
       var item = document.createElement('div');
@@ -1210,6 +1317,27 @@
   }
 
   renderWeek();
+
+  // The cloud copy wins when it is newer; on a second device it is the only
+  // copy there is. Seeded sample data always yields to it.
+  loadCloud(function (remote) {
+    if (!remote) {
+      if (cloud && !state.sample) saveCloud();
+      return;
+    }
+    var localT = state.updatedAt || 0;
+    var remoteT = remote.updatedAt || 0;
+    if (state.sample || remoteT > localT) {
+      state = remote;
+      state.log = state.log || {};
+      state.notes = state.notes || {};
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+      renderAll();
+      flash('Данные подтянулись из Telegram');
+    } else if (localT > remoteT) {
+      saveCloud();
+    }
+  });
 })();
 </script>
 </body>
