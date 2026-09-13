@@ -209,8 +209,11 @@
     transition: background .12s ease, color .12s ease, border-color .12s ease;
   }
   .day .dnum { font-family: Oswald, sans-serif; font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .day .qv { font-size: 9px; font-variant-numeric: tabular-nums; color: var(--muted); letter-spacing: .02em; }
   .day[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-  .day[aria-pressed="true"] .dnum { color: var(--accent-ink); }
+  .day[aria-pressed="true"] .dnum, .day[aria-pressed="true"] .qv { color: var(--accent-ink); }
+  .day.partial { background: var(--accent-soft); border-color: var(--accent); }
+  .day.partial .qv { color: var(--accent); font-weight: 600; }
   .day.today { border-color: var(--accent); border-width: 2px; }
   .day.future { opacity: .4; }
   .day:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -495,7 +498,7 @@
         <input type="text" id="fCat" maxlength="30" list="catList" placeholder="Здоровье">
         <datalist id="catList"></datalist>
       </label>
-      <div class="field">Цель — раз в неделю
+      <div class="field">Сколько дней в неделю
         <div class="chips" id="fGoal"></div>
       </div>
       <div class="field">Приоритет
@@ -503,15 +506,18 @@
       </div>
       <label class="qty">
         <input type="checkbox" id="fQty">
-        Считать количество, а не просто галочку
+        Несколько раз в день или счёт по количеству
       </label>
-      <div class="rowbtns hidden" id="qtyFields">
-        <label class="field" style="flex:1">Единица
-          <input type="text" id="fUnit" maxlength="12" placeholder="мин">
-        </label>
-        <label class="field" style="flex:1">Норма за день
-          <input type="number" id="fTarget" min="1" max="1000" placeholder="20">
-        </label>
+      <div id="qtyFields" class="hidden">
+        <div class="rowbtns">
+          <label class="field" style="flex:1">Единица
+            <input type="text" id="fUnit" maxlength="12" placeholder="раз">
+          </label>
+          <label class="field" style="flex:1">Сколько за день
+            <input type="number" id="fTarget" min="1" max="1000" placeholder="2">
+          </label>
+        </div>
+        <p class="hint">Массаж головы дважды в день — единица «раз», за день 2. В неделе кружок нажимается два раза: первый красит наполовину, второй закрывает день. Для чтения удобнее «мин» и 20.</p>
       </div>
       <div class="rowbtns">
         <button class="btn" type="submit" id="saveBtn">Сохранить</button>
@@ -519,13 +525,13 @@
       </div>
     </form>
 
-    <div class="section-title"><h2>Данные</h2></div>
+    <div class="section-title"><h2>Копия данных</h2></div>
     <div class="rowbtns">
-      <button class="btn ghost" type="button" id="exportBtn">Скопировать</button>
-      <button class="btn ghost" type="button" id="importBtn">Вставить</button>
+      <button class="btn ghost" type="button" id="exportBtn">Сохранить копию</button>
+      <button class="btn ghost" type="button" id="importBtn">Восстановить</button>
     </div>
-    <textarea class="io hidden" id="io" spellcheck="false" aria-label="Данные трекера в формате JSON"></textarea>
-    <p class="hint" id="ioHint">Копия всех отметок текстом — чтобы перенести на другое устройство или сохранить у себя.</p>
+    <textarea class="io hidden" id="io" spellcheck="false" aria-label="Копия данных трекера"></textarea>
+    <p class="hint" id="ioHint">Отметки хранятся на этом устройстве. «Сохранить копию» кладёт их в буфер обмена — перешли себе в «Избранное», и данные не потеряются при смене телефона.</p>
 
     <div class="section-title"><h2>Пример</h2></div>
     <button class="btn ghost" type="button" id="wipeBtn">Очистить данные-пример</button>
@@ -661,13 +667,23 @@
 
   /* ---------------- derived ---------------- */
 
-  function isDone(habit, date) {
+  // Raw stored value: true for a plain tick, a number for counted habits.
+  function rawValue(habit, date) {
     var rec = state.log[habit.id];
-    if (!rec) return false;
-    var v = rec[key(date)];
-    if (v === true) return true;
-    if (typeof v === 'number') return habit.qty ? v >= habit.qty.target : v > 0;
-    return false;
+    return rec ? rec[key(date)] : undefined;
+  }
+
+  // How many units are done that day — the basis for a partly filled day.
+  function countOf(habit, date) {
+    var v = rawValue(habit, date);
+    if (typeof v === 'number') return v;
+    if (v === true) return habit.qty ? habit.qty.target : 1;
+    return 0;
+  }
+
+  function isDone(habit, date) {
+    var need = habit.qty ? habit.qty.target : 1;
+    return countOf(habit, date) >= need;
   }
 
   function doneInWeek(habit, monday) {
@@ -803,7 +819,9 @@
         '<div class="habit-score"><b>' + done + '</b>/' + h.goal +
         (st.n > 0 ? ' <span class="streak">· ' + st.n + ' 🔥</span>' : '') + '</div>';
       top.querySelector('.habit-name').textContent = h.name;
-      top.querySelector('.habit-cat').textContent = h.cat + (st.n > 0 ? ' · ' + st.n + ' ' + st.unit : '');
+      top.querySelector('.habit-cat').textContent = h.cat +
+        (h.qty ? ' · ' + h.qty.target + ' ' + h.qty.unit + ' в день' : '') +
+        (st.n > 0 ? ' · ' + st.n + ' ' + st.unit : '');
       card.appendChild(top);
 
       var bar = document.createElement('div');
@@ -817,11 +835,15 @@
         var b = document.createElement('button');
         b.type = 'button';
         var on = isDone(h, d);
+        var cnt = countOf(h, d);
+        var partial = h.qty && cnt > 0 && !on;
         var future = d > TODAY;
-        b.className = 'day' + (key(d) === key(TODAY) ? ' today' : '') + (future ? ' future' : '');
+        b.className = 'day' + (key(d) === key(TODAY) ? ' today' : '') + (future ? ' future' : '') + (partial ? ' partial' : '');
         b.setAttribute('aria-pressed', on ? 'true' : 'false');
-        b.setAttribute('aria-label', h.name + ', ' + DAY_NAMES[i] + ' ' + d.getDate());
-        b.innerHTML = '<span>' + DAY_NAMES[i] + '</span><span class="dnum">' + d.getDate() + '</span>';
+        b.setAttribute('aria-label', h.name + ', ' + DAY_NAMES[i] + ' ' + d.getDate() +
+          (h.qty ? ', ' + cnt + ' из ' + h.qty.target + ' ' + h.qty.unit : ''));
+        b.innerHTML = '<span>' + DAY_NAMES[i] + '</span><span class="dnum">' + d.getDate() + '</span>' +
+          (h.qty ? '<span class="qv">' + cnt + '/' + h.qty.target + '</span>' : '');
         b.addEventListener('click', function () { toggle(h, d); });
         days.appendChild(b);
       });
@@ -954,8 +976,8 @@
         '<button class="iconbtn" type="button" aria-label="Изменить">✎</button>' +
         '<button class="iconbtn danger" type="button" aria-label="Удалить">✕</button>';
       item.querySelector('.n').textContent = h.name;
-      item.querySelector('.meta').textContent = h.cat + ' · ' + h.goal + ' раз в неделю' +
-        (h.qty ? ' · ' + h.qty.target + ' ' + h.qty.unit : '') +
+      item.querySelector('.meta').textContent = h.cat + ' · ' + h.goal + ' дн. в неделю' +
+        (h.qty ? ' · ' + h.qty.target + ' ' + h.qty.unit + ' в день' : '') +
         (h.prio === 'high' ? ' · высокий' : '');
 
       var btns = item.querySelectorAll('button');
@@ -993,11 +1015,25 @@
 
   /* ---------------- actions ---------------- */
 
+  // A counted habit steps up one unit per tap and wraps back to empty once
+  // the day's quota is full, so two taps mean "twice today".
   function toggle(habit, date) {
     var rec = state.log[habit.id] = state.log[habit.id] || {};
     var k = key(date);
-    if (isDone(habit, date)) delete rec[k];
-    else rec[k] = habit.qty ? habit.qty.target : true;
+    // Small quotas (twice a day) step up per tap; a quota like 20 minutes
+    // would mean twenty taps, so those fill the day in one.
+    if (habit.qty && habit.qty.target <= 6) {
+      var next = countOf(habit, date) + 1;
+      if (next > habit.qty.target) delete rec[k];
+      else rec[k] = next;
+    } else if (habit.qty) {
+      if (isDone(habit, date)) delete rec[k];
+      else rec[k] = habit.qty.target;
+    } else if (isDone(habit, date)) {
+      delete rec[k];
+    } else {
+      rec[k] = true;
+    }
     if (state.sample) state.sample = false;
     save();
     if (tg && tg.HapticFeedback) { try { tg.HapticFeedback.selectionChanged(); } catch (e) {} }
@@ -1116,7 +1152,7 @@
     if (io.classList.contains('hidden')) {
       io.classList.remove('hidden');
       io.value = '';
-      el('ioHint').textContent = 'Вставь сюда сохранённый текст и нажми «Вставить» ещё раз.';
+      el('ioHint').textContent = 'Вставь сюда сохранённую копию и нажми «Восстановить» ещё раз.';
       io.focus();
       return;
     }
