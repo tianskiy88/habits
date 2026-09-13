@@ -406,6 +406,30 @@
   }
   .tab[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
 
+  .remind {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px;
+    display: grid;
+    gap: 11px;
+  }
+  .remind label.field { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
+  .remind input[type="time"] {
+    background: var(--surface-2);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 9px 11px;
+    font: inherit;
+    font-family: Oswald, "Golos Text", sans-serif;
+    font-size: 19px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    width: 100%;
+  }
+  .remind input[type="time"]:focus { border-color: var(--accent); outline: none; }
+  .remind .hint { margin: 0; }
+
   .toast {
     position: fixed;
     left: 50%;
@@ -541,6 +565,18 @@
       </div>
     </form>
 
+    <div class="section-title"><h2>Напоминание</h2></div>
+    <div class="remind">
+      <label class="field" for="fRemind">Во сколько напоминать, по Москве
+        <input type="time" id="fRemind" value="21:00" step="300">
+      </label>
+      <div class="rowbtns">
+        <button class="btn" type="button" id="remindOn">Включить</button>
+        <button class="btn ghost" type="button" id="remindOff">Отключить</button>
+      </div>
+      <p class="hint" id="remindHint"></p>
+    </div>
+
     <div class="section-title"><h2>Копия данных</h2></div>
     <div class="rowbtns">
       <button class="btn ghost" type="button" id="exportBtn">Сохранить копию</button>
@@ -571,7 +607,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '13.09-4';
+  var APP_VERSION = '13.09-5';
   var STORE_KEY = 'habit-tracker-v1';
   var DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   var MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
@@ -1069,6 +1105,13 @@
     var list = el('manageList');
     list.innerHTML = '';
     el('habitCount').textContent = state.habits.length + ' шт.';
+    if (state.remindAt) el('fRemind').value = state.remindAt;
+    el('remindHint').textContent = canSendData()
+      ? (state.remindAt
+          ? 'Сейчас стоит на ' + state.remindAt + '. После «Включить» приложение закроется — так Telegram передаёт настройку боту.'
+          : 'После «Включить» приложение закроется — так Telegram передаёт настройку боту.')
+      : 'Открой приложение кнопкой «🔥 Привычки» под полем ввода в чате с ботом — тогда время ставится отсюда. Иначе напиши боту время сообщением.';
+
     el('syncLine').textContent = (cloud
       ? 'Отметки сохраняются в Telegram — телефон и компьютер видят одно и то же.'
       : 'Отметки сохраняются только на этом устройстве: приложение открыто вне Telegram.')
@@ -1274,6 +1317,44 @@
     } catch (err) {
       el('ioHint').textContent = 'Не получилось прочитать: ' + err.message + '. Нужен текст целиком, как скопировали.';
     }
+  });
+
+  /* ---- reminder ----
+     The bot does the sending, so the chosen time has to reach it. Inside
+     Telegram a web app opened from a keyboard button may hand data back with
+     sendData(); opened any other way it may not, and then the only route left
+     is writing the time to the bot in the chat. Both are spelled out here
+     rather than silently failing. */
+
+  function canSendData() {
+    return !!(tg && typeof tg.sendData === 'function' && tg.initData);
+  }
+
+  function sendSetting(payload, okText) {
+    if (!canSendData()) {
+      el('remindHint').textContent =
+        'Чтобы ставить время отсюда, открой приложение кнопкой «🔥 Привычки» под полем ввода в чате с ботом. ' +
+        'Либо просто напиши боту время сообщением — 21:00.';
+      return;
+    }
+    try {
+      state.remindAt = payload.off ? null : payload.at;
+      save();
+      tg.sendData(JSON.stringify(payload)); // Telegram closes the app after this
+      flash(okText);
+    } catch (e) {
+      el('remindHint').textContent = 'Не получилось передать боту. Напиши ему время сообщением — 21:00.';
+    }
+  }
+
+  el('remindOn').addEventListener('click', function () {
+    var v = el('fRemind').value;
+    if (!/^\d{2}:\d{2}$/.test(v)) { el('remindHint').textContent = 'Укажи время.'; return; }
+    sendSetting({ at: v }, 'Напоминание на ' + v);
+  });
+
+  el('remindOff').addEventListener('click', function () {
+    sendSetting({ off: true }, 'Напоминания отключены');
   });
 
   el('wipeBtn').addEventListener('click', function () {
